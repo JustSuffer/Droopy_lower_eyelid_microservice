@@ -2,7 +2,7 @@ import cv2
 import numpy as np
 from ultralytics import YOLO
 
-# Modeli bir kere global olarak yükleyelim (Hız için)
+
 model_path = 'FINAL_EYELID_MODEL.pt'
 try:
     model = YOLO(model_path)
@@ -10,7 +10,7 @@ except Exception as e:
     model = None
     print(f"Model yüklenemedi: {e}")
 
-# Sabitler
+
 BLOOD_RED = (0, 0, 139)
 VH_GREEN = (0, 128, 0)
 POINT_COLOR = (0, 0, 255)
@@ -29,7 +29,7 @@ def process_eye_image(image_bytes):
     if model is None:
         raise Exception("Model dosyası bulunamadı!")
 
-    # Byte verisini OpenCV formatına çevir
+    
     nparr = np.frombuffer(image_bytes, np.uint8)
     img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
     
@@ -40,13 +40,13 @@ def process_eye_image(image_bytes):
     max_dim = max(w_img, h_img)
     px_per_cm = px_per_cm_for_image(w_img, h_img)
 
-    # Ölçeklendirme ayarları
+    
     gscale = max(1.2, np.sqrt((w_img * h_img) / (1280 * 720)))
     line_thickness = max(3, int(4 * gscale))
     point_radius = max(4, int(6 * gscale))
     panel_scale_factor = 0.75 if 1000 <= max_dim <= 2000 else 1.0
 
-    # Tahmin
+    
     results = model.predict(source=img, conf=0.5, save=False)
 
     top_panel_lines = []
@@ -72,7 +72,7 @@ def process_eye_image(image_bytes):
             cx, cy = np.round([(x1 + x2) / 2, (y1 + y2) / 2]).astype(int)
             eye_centers.append(cy)
 
-            # Çizimler
+            
             cv2.rectangle(img, (x1, y1), (x2, y2), BLOOD_RED, line_thickness)
             cv2.circle(img, (cx, cy), point_radius, POINT_COLOR, -1)
 
@@ -81,7 +81,7 @@ def process_eye_image(image_bytes):
             mrd2_cm = px_to_cm(mrd2_px, px_per_cm)
             pfh_cm = px_to_cm(pfh_px, px_per_cm) * 0.75
 
-            # Yüzde Etiketi (Kutunun Altına)
+            
             base_scale = min(x2 - x1, y2 - y1) / 180.0
             pct_scale = max(0.9, min(2.0, base_scale * 1.2 * gscale))
             pct_thick = max(2, int(round(2.0 * pct_scale)))
@@ -109,13 +109,13 @@ def process_eye_image(image_bytes):
             name = labels[idx] if idx < len(labels) else f"Eye {idx+1}"
             top_panel_lines.append(f"{name}: MRD2 {mrd2_cm:.2f} cm | PFH {pfh_cm:.2f} cm")
 
-    # VH Hesabı
+    
     if len(eye_centers) >= 2:
         vh_px = abs(eye_centers[0] - eye_centers[1])
         vh_cm = px_to_cm(vh_px, px_per_cm)
         bottom_panel_lines.append(f"VH: {vh_cm:.2f} cm")
 
-    # Üst Panel Çizimi
+    
     if top_panel_lines:
         font_scale = max(1.0, min(2.0, (w_img + h_img) / 1800.0 * gscale)) * panel_scale_factor
         thick = max(2, int(round(2.5 * font_scale)))
@@ -136,7 +136,7 @@ def process_eye_image(image_bytes):
             ty = py1 + pad + (i + 1) * line_h - sizes[i][1] - pad // 2
             cv2.putText(img, t, (tx, ty), FONT, font_scale, (255, 255, 255), thick, cv2.LINE_AA)
 
-    # Alt Panel Çizimi (VH - Yeşil)
+    
     if bottom_panel_lines:
         font_scale = max(1.0, min(2.0, (w_img + h_img) / 1800.0 * gscale)) * panel_scale_factor
         thick = max(2, int(round(2.5 * font_scale)))
@@ -158,6 +158,6 @@ def process_eye_image(image_bytes):
             ty = py1 + pad + (i + 1) * line_h - sizes[i][1] - pad // 2
             cv2.putText(img, t, (tx, ty), FONT, font_scale, (255, 255, 255), thick, cv2.LINE_AA)
 
-    # İşlenmiş görüntüyü tekrar byte'a çevirip döndür
+    
     _, encoded_img = cv2.imencode('.jpg', img)
     return encoded_img.tobytes()
